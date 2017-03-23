@@ -8,10 +8,11 @@ echo json_encode(linksCount(
 	isset($_REQUEST['namespace']) ? $_REQUEST['namespace'] : 0,
 	isset($_REQUEST['p']) ? $_REQUEST['p'] : '',
 	isset($_REQUEST['fromNamespace']) ? $_REQUEST['fromNamespace'] : '',
+	isset($_REQUEST['invertFromNamespace']) ? $_REQUEST['invertFromNamespace'] === 'true' : false,
 	isset($_REQUEST['dbname']) ? $_REQUEST['dbname'] : 'fawiki'
 ));
 
-function linksCount($namespace, $page, $fromNamespace, $dbname) {
+function linksCount($namespace, $page, $fromNamespace, $invertFromNamespace, $dbname) {
 	if ($page === '') {
 		return ['#documentation' => 'Page links and transclusions count retrieval, use it like ?namespace=0&p=Earth&fromNamespace=0&dbname=enwiki Source: github.com/ebraminio/linkscount'];
 	}
@@ -29,8 +30,9 @@ function linksCount($namespace, $page, $fromNamespace, $dbname) {
 	$tlExtraCondition = '';
 	if ($fromNamespace !== '') {
 		$fromNamespace = +$fromNamespace;
-		$plExtraCondition = "AND pl_from_namespace = $fromNamespace";
-		$tlExtraCondition = "AND tl_from_namespace = $fromNamespace";
+		$operator = $invertFromNamespace ? '<>' : '=';
+		$plExtraCondition = "AND pl_from_namespace $operator $fromNamespace";
+		$tlExtraCondition = "AND tl_from_namespace $operator $fromNamespace";
 	}
 
 	$pagelinks = execCountQuery($db, "
