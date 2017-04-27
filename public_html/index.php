@@ -18,7 +18,7 @@ function linksCount($namespace, $page, $fromNamespace, $invertFromNamespace, $db
 	}
 
 	if (preg_match('/^[a-z_\-]{1,20}$/', $dbname) === 0) { return ['#error' => 'Invalid "dbname" is provided']; };
-	if (preg_match('/wiki$/', $dbname) === 0) { $dbname = $dbname . 'wiki'; }
+	if (preg_match('/wiki/', $dbname) === 0) { $dbname = $dbname . 'wiki'; }
 
 	$ini = parse_ini_file('../replica.my.cnf');
 	$db = mysqli_connect('enwiki.labsdb', $ini['user'], $ini['password'], $dbname . '_p');
