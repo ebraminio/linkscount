@@ -28,11 +28,13 @@ function linksCount($namespace, $page, $fromNamespace, $invertFromNamespace, $db
 
 	$plExtraCondition = '';
 	$tlExtraCondition = '';
+	$ilExtraCondition = '';
 	if ($fromNamespace !== '') {
 		$fromNamespace = +$fromNamespace;
 		$operator = $invertFromNamespace ? '<>' : '=';
 		$plExtraCondition = "AND pl_from_namespace $operator $fromNamespace";
 		$tlExtraCondition = "AND tl_from_namespace $operator $fromNamespace";
+		$ilExtraCondition = "AND il_from_namespace $operator $fromNamespace";
 	}
 
 	$pagelinks = execCountQuery($db, "
@@ -49,9 +51,19 @@ function linksCount($namespace, $page, $fromNamespace, $invertFromNamespace, $db
 	");
 	if ($templatelinks === -1) { return ['#error' => 'Internal server error']; }
 
+	$filelinks = 0;
+	if ($namespace === 6) {
+		$filelinks = execCountQuery($db, "
+			SELECT COUNT(*)
+			FROM imagelinks
+			WHERE il_to = '$page' $ilExtraCondition;
+		");
+		if ($templatelinks === -1) { return ['#error' => 'Internal server error']; }
+	}
+
 	mysqli_close($db);
 
-	return ['pagelinks' => $pagelinks, 'templatelinks' => $templatelinks];
+	return ['pagelinks' => $pagelinks, 'templatelinks' => $templatelinks, 'filelinks' => $filelinks];
 }
 
 function execCountQuery($db, $query) {
