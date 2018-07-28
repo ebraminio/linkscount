@@ -61,9 +61,20 @@ function linksCount($namespace, $page, $fromNamespace, $invertFromNamespace, $db
 		if ($templatelinks === -1) { return ['#error' => 'Internal server error']; }
 	}
 
+	$globalfilelinks = 0;
+	if ($namespace === 6) {
+		mysqli_select_db($db, "commonswiki_p");
+		$globalfilelinks = execCountQuery($db, "
+			SELECT COUNT(*)
+			FROM globalimagelinks
+			WHERE gil_to = '$page';
+		");
+		if ($globalfilelinks === -1) { return ['#error' => 'Internal server error']; }
+	}
+
 	mysqli_close($db);
 
-	return ['pagelinks' => $pagelinks, 'templatelinks' => $templatelinks, 'filelinks' => $filelinks];
+	return ['pagelinks' => $pagelinks, 'templatelinks' => $templatelinks, 'filelinks' => $filelinks, 'globalfilelinks' => $globalfilelinks];
 }
 
 function execCountQuery($db, $query) {
