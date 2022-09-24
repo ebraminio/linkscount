@@ -21,7 +21,7 @@ function linksCount($namespace, $page, $fromNamespace, $invertFromNamespace, $db
 	if (preg_match('/wiki/', $dbname) === 0) { $dbname = $dbname . 'wiki'; }
 
 	$ini = parse_ini_file('../replica.my.cnf');
-	$db = mysqli_connect('enwiki.labsdb', $ini['user'], $ini['password'], $dbname . '_p');
+	$db = mysqli_connect($dbname . '.labsdb', $ini['user'], $ini['password'], $dbname . '_p');
 
 	$namespace = +$namespace;
 	$page = mysqli_real_escape_string($db, str_replace(' ', '_', $page));
