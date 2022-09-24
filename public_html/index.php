@@ -17,74 +17,91 @@ function linksCount($namespace, $page, $fromNamespace, $invertFromNamespace, $db
 		return ['#documentation' => 'Page links and transclusions count retrieval, use it like ?namespace=0&p=Earth&fromNamespace=0&dbname=enwiki Source: github.com/ebraminio/linkscount'];
 	}
 
-	if (preg_match('/^[a-z_\-]{1,20}$/', $dbname) === 0) { return ['#error' => 'Invalid "dbname" is provided']; };
+	try {
+		return doLinksCount((int)$namespace, $page, $fromNamespace === '' ? null : (int)$fromNamespace, $invertFromNamespace, $dbname);
+	} catch (LinkscountException $e) {
+		return ['#error' => $e->getMessage() ];
+	}
+}
+
+function doLinksCount(int $namespace, string $page, ?int $fromNamespace, bool $invertFromNamespace, string $dbname): array {
+	if (preg_match('/^[a-z_\-]{1,20}$/', $dbname) === 0) { throw new LinkscountException('Invalid "dbname" is provided'); }
 	if (preg_match('/wiki/', $dbname) === 0) { $dbname = $dbname . 'wiki'; }
 
-	$ini = parse_ini_file('../replica.my.cnf');
-	$db = mysqli_connect($dbname . '.labsdb', $ini['user'], $ini['password'], $dbname . '_p');
+	$db = getDbConnection($dbname);
 
-	$namespace = +$namespace;
 	$page = mysqli_real_escape_string($db, str_replace(' ', '_', $page));
 
 	$plExtraCondition = '';
 	$tlExtraCondition = '';
 	$ilExtraCondition = '';
-	if ($fromNamespace !== '') {
-		$fromNamespace = +$fromNamespace;
+	if ($fromNamespace !== null) {
 		$operator = $invertFromNamespace ? '<>' : '=';
 		$plExtraCondition = "AND pl_from_namespace $operator $fromNamespace";
-		$tlExtraCondition = "AND lt_from_namespace $operator $fromNamespace";
+		$tlExtraCondition = "AND tl_from_namespace $operator $fromNamespace";
 		$ilExtraCondition = "AND il_from_namespace $operator $fromNamespace";
 	}
 
-	$pagelinks = execCountQuery($db, "
+	// ID of the page in the `linktarget` table (to be used in other queries, NOT a link count)
+	$linktarget = execIntQuery($db, "
+		SELECT lt_id
+		FROM linktarget
+		WHERE lt_namespace = $namespace AND lt_title = '$page';
+	");
+
+	// TODO will be broken by T299947
+	$pagelinks = execIntQuery($db, "
 		SELECT COUNT(*)
 		FROM pagelinks
 		WHERE pl_namespace = $namespace AND pl_title = '$page' $plExtraCondition;
 	");
-	if ($pagelinks === -1) { return ['#error' => 'Internal server error']; }
 
-	$templatelinks = execCountQuery($db, "
+	$templatelinks = execIntQuery($db, "
 		SELECT COUNT(*)
 		FROM templatelinks
-		WHERE tl_target_id = (SELECT lt_id FROM linktarget WHERE lt_namespace = $namespace AND lt_title = '$page' $tlExtraCondition);
+		WHERE tl_target_id = $linktarget $tlExtraCondition;
 	");
-	if ($templatelinks === -1) { return ['#error' => 'Internal server error']; }
 
 	$filelinks = 0;
 	if ($namespace === 6) {
-		$filelinks = execCountQuery($db, "
+		// TODO will be broken by T299953
+		$filelinks = execIntQuery($db, "
 			SELECT COUNT(*)
 			FROM imagelinks
 			WHERE il_to = '$page' $ilExtraCondition;
 		");
-		if ($templatelinks === -1) { return ['#error' => 'Internal server error']; }
 	}
 
 	$globalfilelinks = 0;
 	if ($namespace === 6) {
-		mysqli_select_db($db, "commonswiki_p");
-		$globalfilelinks = execCountQuery($db, "
+		$globalfilelinks = execIntQuery(getDbConnection('commonswiki'), "
 			SELECT COUNT(*)
 			FROM globalimagelinks
 			WHERE gil_to = '$page';
 		");
-		if ($globalfilelinks === -1) { return ['#error' => 'Internal server error']; }
 	}
-
-	mysqli_close($db);
 
 	return ['pagelinks' => $pagelinks, 'templatelinks' => $templatelinks, 'filelinks' => $filelinks, 'globalfilelinks' => $globalfilelinks];
 }
 
-function execCountQuery($db, $query) {
+/** Get a DB connection pointing to a suitable server and with default DB set. */
+function getDbConnection(string $dbname): mysqli {
+	$ini = parse_ini_file('../replica.my.cnf');
+	return new mysqli($dbname . '.labsdb', $ini['user'], $ini['password'], $dbname . '_p');
+}
+
+/** Get a single integer result from the DB. */
+function execIntQuery(mysqli $db, string $query): int {
 	$dbResult = mysqli_query($db, $query);
 	if (!$dbResult) {
 		error_log(mysqli_error($db));
 		error_log($query);
-		return -1;
+		throw new LinkscountException('Internal server error');
 	}
 	$count = +($dbResult->fetch_row()[0]);
 	mysqli_free_result($dbResult);
 	return $count;
 }
+
+/** An error that should be shown to the user. */
+class LinkscountException extends Exception {}
