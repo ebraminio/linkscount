@@ -33,7 +33,7 @@ function linksCount($namespace, $page, $fromNamespace, $invertFromNamespace, $db
 		$fromNamespace = +$fromNamespace;
 		$operator = $invertFromNamespace ? '<>' : '=';
 		$plExtraCondition = "AND pl_from_namespace $operator $fromNamespace";
-		$tlExtraCondition = "AND tl_from_namespace $operator $fromNamespace";
+		$tlExtraCondition = "AND lt_from_namespace $operator $fromNamespace";
 		$ilExtraCondition = "AND il_from_namespace $operator $fromNamespace";
 	}
 
@@ -47,7 +47,7 @@ function linksCount($namespace, $page, $fromNamespace, $invertFromNamespace, $db
 	$templatelinks = execCountQuery($db, "
 		SELECT COUNT(*)
 		FROM templatelinks
-		WHERE tl_namespace = $namespace AND tl_title = '$page' $tlExtraCondition;
+		WHERE tl_target_id = (SELECT lt_id FROM linktarget WHERE lt_namespace = $namespace AND lt_title = '$page' $tlExtraCondition);
 	");
 	if ($templatelinks === -1) { return ['#error' => 'Internal server error']; }
 
