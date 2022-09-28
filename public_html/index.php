@@ -5,22 +5,22 @@ header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
 echo json_encode(linksCount(
-	isset($_REQUEST['namespace']) ? $_REQUEST['namespace'] : 0,
-	isset($_REQUEST['p']) ? $_REQUEST['p'] : '',
-	isset($_REQUEST['fromNamespace']) ? $_REQUEST['fromNamespace'] : '',
-	isset($_REQUEST['invertFromNamespace']) ? $_REQUEST['invertFromNamespace'] === 'true' : false,
-	isset($_REQUEST['dbname']) ? $_REQUEST['dbname'] : 'fawiki'
+	+($_REQUEST['namespace'] ?? '0'),
+	$_REQUEST['p'] ?? '',
+	isset($_REQUEST['fromNamespace']) ? +$_REQUEST['fromNamespace'] : null,
+	($_REQUEST['invertFromNamespace'] ?? 'false') === 'true',
+	$_REQUEST['dbname'] ?? 'enwiki'
 ));
 
-function linksCount($namespace, $page, $fromNamespace, $invertFromNamespace, $dbname) {
+function linksCount(int $namespace, string $page, ?int $fromNamespace, bool $invertFromNamespace, string $dbname): array {
 	if ($page === '') {
 		return ['#documentation' => 'Page links and transclusions count retrieval, use it like ?namespace=0&p=Earth&fromNamespace=0&dbname=enwiki Source: github.com/ebraminio/linkscount'];
 	}
 
 	try {
-		return doLinksCount((int)$namespace, $page, $fromNamespace === '' ? null : (int)$fromNamespace, $invertFromNamespace, $dbname);
+		return doLinksCount($namespace, $page, $fromNamespace, $invertFromNamespace, $dbname);
 	} catch (LinkscountException $e) {
-		return ['#error' => $e->getMessage() ];
+		return ['#error' => $e->getMessage()];
 	}
 }
 
