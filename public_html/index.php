@@ -26,7 +26,7 @@ function linksCount(int $namespace, string $page, ?int $fromNamespace, bool $inv
 
 function doLinksCount(int $namespace, string $page, ?int $fromNamespace, bool $invertFromNamespace, string $dbname): array {
 	if (preg_match('/^[a-z_\-]{1,20}$/', $dbname) !== 1) { throw new LinkscountException('Invalid "dbname" is provided'); }
-	if (preg_match('/wiki/', $dbname) !== 1) { $dbname = $dbname . 'wiki'; }
+	if (preg_match('/wiki$/', $dbname) !== 1) { $dbname = $dbname . 'wiki'; }
 
 	$db = getDbConnection($dbname);
 
