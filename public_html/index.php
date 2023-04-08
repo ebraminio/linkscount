@@ -7,10 +7,10 @@ header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
 echo json_encode(linksCount(
-	+($_REQUEST['namespace'] ?? '0'),
+	filter_var($_REQUEST['namespace'] ?? '', FILTER_VALIDATE_INT, ['options' => ['default' => 0, 'min_range' => 0]]),
 	$_REQUEST['p'] ?? '',
-	isset($_REQUEST['fromNamespace']) ? +$_REQUEST['fromNamespace'] : null,
-	($_REQUEST['invertFromNamespace'] ?? 'false') === 'true',
+	filter_var($_REQUEST['fromNamespace'] ?? '', FILTER_VALIDATE_INT, ['options' => ['default' => null, 'min_range' => 0]]),
+	filter_var($_REQUEST['invertFromNamespace'] ?? '', FILTER_VALIDATE_BOOLEAN),
 	$_REQUEST['dbname'] ?? 'enwiki'
 ));
 
@@ -45,6 +45,8 @@ function doLinksCount(int $namespace, string $page, ?int $fromNamespace, bool $i
 	}
 
 	// ID of the page in the `linktarget` table (to be used in other queries, NOT a link count)
+	// It may be null if there are no links of types that have been normalized (i.e. no template
+	// links right now)
 	$linktarget = execIntQuery($db, "
 		SELECT lt_id
 		FROM linktarget
@@ -58,11 +60,13 @@ function doLinksCount(int $namespace, string $page, ?int $fromNamespace, bool $i
 		WHERE pl_namespace = $namespace AND pl_title = '$page' $plExtraCondition;
 	");
 
-	$templatelinks = execIntQuery($db, "
-		SELECT COUNT(*)
-		FROM templatelinks
-		WHERE tl_target_id = $linktarget $tlExtraCondition;
-	");
+	$templatelinks = $linktarget !== null
+		? execIntQuery($db, "
+			SELECT COUNT(*)
+			FROM templatelinks
+			WHERE tl_target_id = $linktarget $tlExtraCondition;
+		")
+		: 0;
 
 	$filelinks = 0;
 	if ($namespace === 6) {
@@ -88,21 +92,27 @@ function doLinksCount(int $namespace, string $page, ?int $fromNamespace, bool $i
 
 /** Get a DB connection pointing to a suitable server and with default DB set. */
 function getDbConnection(string $dbname): mysqli {
+	mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 	$ini = parse_ini_file('../replica.my.cnf');
-	return new mysqli($dbname . '.labsdb', $ini['user'], $ini['password'], $dbname . '_p');
+	try {
+		return new mysqli($dbname . '.labsdb', $ini['user'], $ini['password'], $dbname . '_p');
+	} catch (mysqli_sql_exception $e) {
+		error_log("Unable to connect to database '$dbname': $e");
+		throw new LinkscountException('Internal server error');
+	}
 }
 
 /** Get a single integer result from the DB. */
-function execIntQuery(mysqli $db, string $query): int {
-	$dbResult = mysqli_query($db, $query);
+function execIntQuery(mysqli $db, string $query): ?int {
+	$dbResult = $db->query($query);
 	if (!$dbResult) {
-		error_log(mysqli_error($db));
+		error_log($db->error);
 		error_log($query);
 		throw new LinkscountException('Internal server error');
 	}
-	$count = +($dbResult->fetch_row()[0]);
-	mysqli_free_result($dbResult);
-	return $count;
+	$row = $dbResult->fetch_row();
+	$dbResult->free();
+	return is_array($row) ? (int)$row[0] : null;
 }
 
 /** An error that should be shown to the user. */
