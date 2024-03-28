@@ -57,7 +57,7 @@ function doLinksCount(int $namespace, string $page, ?int $fromNamespace, bool $i
 	$pagelinks = execIntQuery($db, "
 		SELECT COUNT(*)
 		FROM pagelinks
-		WHERE pl_namespace = $namespace AND pl_title = '$page' $plExtraCondition;
+		WHERE pl_target_id = $linktarget $plExtraCondition;
 	");
 
 	$templatelinks = $linktarget !== null
