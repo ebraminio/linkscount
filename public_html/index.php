@@ -53,12 +53,13 @@ function doLinksCount(int $namespace, string $page, ?int $fromNamespace, bool $i
 		WHERE lt_namespace = $namespace AND lt_title = '$page';
 	");
 
-	// TODO will be broken by T299947
-	$pagelinks = execIntQuery($db, "
-		SELECT COUNT(*)
-		FROM pagelinks
-		WHERE pl_target_id = $linktarget $plExtraCondition;
-	");
+	$pagelinks = $linktarget !== null
+		? execIntQuery($db, "
+			SELECT COUNT(*)
+			FROM pagelinks
+			WHERE pl_target_id = $linktarget $plExtraCondition;
+		")
+		: 0;
 
 	$templatelinks = $linktarget !== null
 		? execIntQuery($db, "
